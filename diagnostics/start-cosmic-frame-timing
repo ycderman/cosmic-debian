@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+if [ "${1:-}" != --in-login-shell ]; then
+    export COSMIC_FRAME_SAFETY_MARGIN_MS=${1:-6}
+    if [ -n "${SHELL:-}" ]; then
+        exec "$SHELL" -l -c 'exec /usr/local/bin/start-cosmic-frame-timing --in-login-shell'
+    fi
+fi
+
+export COSMIC_FRAME_SAFETY_MARGIN_MS=${COSMIC_FRAME_SAFETY_MARGIN_MS:-6}
+export COSMIC_BACKEND=kms
+export XDG_CURRENT_DESKTOP=COSMIC
+export XDG_SESSION_DESKTOP=COSMIC
+export XDG_SESSION_TYPE=wayland
+margin_dir=${XDG_RUNTIME_DIR:?}/cosmic-frame-timing
+mkdir -m0700 -p "$margin_dir"
+margin_tmp=$(mktemp "$margin_dir/.margin.XXXXXX")
+printf '%s\n' "$COSMIC_FRAME_SAFETY_MARGIN_MS" > "$margin_tmp"
+export COSMIC_FRAME_SAFETY_MARGIN_FILE=$margin_dir/safety-margin-ms
+mv "$margin_tmp" "$COSMIC_FRAME_SAFETY_MARGIN_FILE"
+export PATH="/opt/cosmic-frame-timing/bin:$PATH"
+exec /usr/bin/start-cosmic --in-login-shell

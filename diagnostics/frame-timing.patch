@@ -1,0 +1,60 @@
+--- a/build.rs
++++ b/build.rs
+@@ -4,0 +5,5 @@
++    println!("cargo:rerun-if-env-changed=SOURCE_GIT_HASH");
++    if let Ok(git_hash) = std::env::var("SOURCE_GIT_HASH") {
++        println!("cargo:rustc-env=GIT_HASH={}", git_hash);
++        return;
++    }
+--- a/src/backend/kms/surface/timings.rs
++++ b/src/backend/kms/surface/timings.rs
+@@ -16,0 +17,2 @@
++    safety_margin: Duration,
++    safety_margin_file: Option<std::path::PathBuf>,
+@@ -84,0 +87,21 @@
++        // Diagnostic override: compare timing budgets in separate test sessions
++        // without changing the upstream default or any rendering feature.
++        let safety_margin = match std::env::var("COSMIC_FRAME_SAFETY_MARGIN_MS") {
++            Ok(value) => match value.parse::<u64>() {
++                Ok(ms) => {
++                    tracing::info!(ms, "Using diagnostic frame safety margin");
++                    Duration::from_millis(ms)
++                }
++                Err(error) => {
++                    tracing::warn!(%value, %error, "Invalid diagnostic frame safety margin; using upstream default");
++                    BASE_SAFETY_MARGIN
++                }
++            },
++            Err(_) => BASE_SAFETY_MARGIN,
++        };
++        let safety_margin_file = std::env::var_os("COSMIC_FRAME_SAFETY_MARGIN_FILE")
++            .map(std::path::PathBuf::from);
++        if let Some(path) = safety_margin_file.as_ref() {
++            tracing::info!(?path, "Using live diagnostic frame margin file");
++        }
++
+@@ -89,0 +113,2 @@
++            safety_margin,
++            safety_margin_file,
+@@ -100,0 +126,9 @@
++    }
++
++    fn safety_margin(&self) -> Duration {
++        self.safety_margin_file
++            .as_ref()
++            .and_then(|path| std::fs::read_to_string(path).ok())
++            .and_then(|value| value.trim().parse::<u64>().ok())
++            .map(Duration::from_millis)
++            .unwrap_or(self.safety_margin)
+@@ -360 +394 @@
+-            } + BASE_SAFETY_MARGIN,
++            } + self.safety_margin(),
+@@ -385,4 +419,4 @@
+-            return estimated_presentation_time.saturating_sub(baseline + BASE_SAFETY_MARGIN);
+-        };
+-
+-        let margin = avg_submittime + BASE_SAFETY_MARGIN;
++            return estimated_presentation_time.saturating_sub(baseline + self.safety_margin());
++        };
++
++        let margin = avg_submittime + self.safety_margin();

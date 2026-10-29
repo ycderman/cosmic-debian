@@ -41,3 +41,4 @@ with the usual `apt upgrade`.
 - `build.sh`: builds one package
 - `repo.sh`: makes the signed APT repository
 - `fixes/`: small Debian changes, one file per package
+- [`diagnostics/`](diagnostics/README.md): optional frame timing comparison, separate from the published packages

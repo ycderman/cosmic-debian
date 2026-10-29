@@ -1,0 +1,16 @@
+#!/bin/sh
+# Isolate compositor state while sharing the user's normal appearance settings.
+set -eu
+
+state_root=${XDG_STATE_HOME:-"$HOME/.local/state"}
+test_state=$state_root/cosmic-frame-timing/${COSMIC_FRAME_SAFETY_MARGIN_MS:-3}
+
+if [ ! -d "$test_state/cosmic-comp" ]; then
+    mkdir -p "$test_state"
+    if [ -d "$state_root/cosmic-comp" ]; then
+        cp -a "$state_root/cosmic-comp" "$test_state/"
+    fi
+fi
+
+export XDG_STATE_HOME=$test_state
+exec /opt/cosmic-frame-timing/libexec/cosmic-comp

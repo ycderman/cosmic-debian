@@ -1,0 +1,143 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      epoch:
+        description: COSMIC release tag, e.g. epoch-1.11.0 (empty = latest)
+        required: false
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      build: ${{ steps.find.outputs.build }}
+      version: ${{ steps.find.outputs.version }}
+      randr: ${{ steps.find.outputs.randr }}
+      packages: ${{ steps.find.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANTED: ${{ inputs.epoch }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          tag=${WANTED:-$(gh api repos/pop-os/cosmic-epoch/releases/latest --jq .tag_name)}
+          version=${tag#epoch-}
+          published=$(curl -fsL https://ycderman.github.io/cosmic-debian/version || true)
+
+          build=true
+          if [ "$EVENT" = schedule ] && [ "$published" = "$version" ]; then
+            build=false
+          fi
+
+          sh list.sh "$tag" > packages.txt
+          cat packages.txt
+
+          json=$(jq -R -s -c 'split("\n") | map(select(length > 0) | split(" ")
+            | {name: .[0], url: .[1], commit: .[2], version: (.[3] // "")})' packages.txt)
+
+          {
+            echo "build=$build"
+            echo "version=$version"
+            echo "randr=$(echo "$json" | jq -c 'map(select(.name == "cosmic-randr")) | .[0]')"
+            echo "packages=$(echo "$json" | jq -c 'map(select(.name != "cosmic-randr"))')"
+          } >> "$GITHUB_OUTPUT"
+
+  # Some packages need cosmic-randr to build, so it goes first.
+  randr:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      PKG: ${{ needs.check.outputs.randr }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - run: |
+          docker run --rm -v "$PWD:/w" -w /w debian:testing sh build.sh \
+            "$(echo "$PKG" | jq -r .name)" "$(echo "$PKG" | jq -r .url)" \
+            "$(echo "$PKG" | jq -r .commit)" "$(echo "$PKG" | jq -r .version)"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb-cosmic-randr
+          path: out/*.deb
+          retention-days: 7
+
+  build:
+    needs: [check, randr]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: ${{ fromJSON(needs.check.outputs.packages) }}
+    name: ${{ matrix.pkg.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Rust builds are big; the runner has things we don't need.
+      - run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb-cosmic-randr
+          path: deps
+
+      - env:
+          NAME: ${{ matrix.pkg.name }}
+          URL: ${{ matrix.pkg.url }}
+          COMMIT: ${{ matrix.pkg.commit }}
+          VERSION: ${{ matrix.pkg.version }}
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w debian:testing \
+            sh build.sh "$NAME" "$URL" "$COMMIT" "$VERSION"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb-${{ matrix.pkg.name }}
+          path: out/*.deb
+          retention-days: 7
+
+  publish:
+    needs: [check, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: deb-*
+          path: debs
+          merge-multiple: true
+
+      - env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          echo "$SIGNING_KEY" | gpg --batch --import
+          sh repo.sh debs site "$VERSION"
+          ls -l site/pool
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

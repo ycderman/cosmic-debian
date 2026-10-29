@@ -64,6 +64,9 @@ statistics. It requires `cc`, `pkg-config`, `wayland-scanner`,
 `wayland-protocols`, and the Wayland/EGL/OpenGL development packages. The
 probe's separate fullscreen and fixed-timer modes are not used by this test.
 The installed tools and the user's measurement cache survive a reboot.
+Set `PROBE_SIZE=2400x1300` for a large windowed composition workload; the
+default is 320x160. This retains normal composition rather than fullscreen
+direct scanout, and the chosen size is recorded in the measurement metadata.
 
 The compositor copies its existing state on first start into
 `$XDG_STATE_HOME/cosmic-frame-timing/<margin>/` (normally under `~/.local/state`),

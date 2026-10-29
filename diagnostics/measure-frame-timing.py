@@ -61,6 +61,7 @@ with (compositor / "exe").open("rb") as stream:
     "compositor_pid": int(compositor.name),
     "compositor_sha256": binary_sha256,
     "backend": "kms",
+    "probe_size": os.environ.get("PROBE_SIZE", "320x160"),
     "wayland_display": os.environ["WAYLAND_DISPLAY"],
     "original_margin": original.decode(),
 }, indent=2) + "\n")

@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 #include "xdg-shell-client-protocol.h"
 #include "presentation-time-client-protocol.h"
 static struct wl_display *display;
@@ -69,6 +70,8 @@ static void draw(void){
  }
 }
 int main(int argc,char**argv){
+ const char *size=getenv("PROBE_SIZE");
+ if(size){int w=0,h=0;char extra;if(sscanf(size,"%dx%d%c",&w,&h,&extra)!=2||w<1||h<1||w>INT_MAX/h/4){fprintf(stderr,"Invalid PROBE_SIZE\n");return 2;}width=w;height=h;}
  setbuf(stdout,0);egl_mode=argc>1&&!strcmp(argv[1],"egl");fullscreen=getenv("PROBE_FULLSCREEN")!=NULL;timer_mode=getenv("PROBE_TIMER")!=NULL;display=wl_display_connect(0);if(!display)return 2;
  struct wl_registry*r=wl_display_get_registry(display);wl_registry_add_listener(r,&rl,0);wl_display_roundtrip(display);
  if(!compositor||!wm||!shm)return 3;

@@ -52,8 +52,8 @@ back to `COSMIC_FRAME_SAFETY_MARGIN_MS` (or upstream's 3 ms default).
 Build and run the presentation probe from a terminal in the test session:
 
 ```sh
-sh diagnostics/build-probe.sh
-python3 diagnostics/measure-frame-timing.py "$HOME/.cache/cosmic-frame-timing/presentation-probe/probe"
+sh /opt/cosmic-frame-timing/tools/build-probe.sh
+python3 /opt/cosmic-frame-timing/tools/measure-frame-timing.py "$HOME/.cache/cosmic-frame-timing/presentation-probe/probe"
 ```
 
 The launcher explicitly selects the native KMS backend. The measurement script
@@ -63,6 +63,7 @@ the original margin. It excludes each window's first two seconds from the
 statistics. It requires `cc`, `pkg-config`, `wayland-scanner`,
 `wayland-protocols`, and the Wayland/EGL/OpenGL development packages. The
 probe's separate fullscreen and fixed-timer modes are not used by this test.
+The installed tools and the user's measurement cache survive a reboot.
 
 The compositor copies its existing state on first start into
 `$XDG_STATE_HOME/cosmic-frame-timing/<margin>/` (normally under `~/.local/state`),

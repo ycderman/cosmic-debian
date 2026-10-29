@@ -19,7 +19,7 @@ export DEB_BUILD_OPTIONS="noautodbgsym nocheck"
 export SOURCE_GIT_HASH=$commit
 
 apt-get update -q
-apt-get install -y -q --no-install-recommends ca-certificates git build-essential
+apt-get install -y -q --no-install-recommends ca-certificates git git-lfs build-essential
 
 if ls deps/*.deb >/dev/null 2>&1; then
 	apt-get install -y -q ./deps/*.deb
@@ -28,8 +28,16 @@ fi
 mkdir -p "src/$name" out
 cd "src/$name"
 git init -q
-git fetch -q --depth 1 "$url" "$commit"
+if git config --local --get remote.origin.url >/dev/null; then
+	git remote set-url origin "$url"
+else
+	git remote add origin "$url"
+fi
+git lfs install --local
+git fetch -q --depth 1 origin "$commit"
 git checkout -q FETCH_HEAD
+git lfs pull origin
+git lfs fsck
 
 if [ -f "$top/fixes/$name.sh" ]; then
 	sh "$top/fixes/$name.sh"

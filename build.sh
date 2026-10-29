@@ -15,6 +15,9 @@ top=$PWD
 export DEBIAN_FRONTEND=noninteractive
 export DEB_BUILD_OPTIONS="noautodbgsym nocheck"
 
+# Some justfiles write this into the build, as the Pop!_OS build does.
+export SOURCE_GIT_HASH=$commit
+
 apt-get update -q
 apt-get install -y -q --no-install-recommends ca-certificates git build-essential
 

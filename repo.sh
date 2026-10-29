@@ -25,7 +25,8 @@ apt-ftparchive \
 	-o APT::FTPArchive::Release::Codename=forky \
 	-o APT::FTPArchive::Release::Architectures=amd64 \
 	-o APT::FTPArchive::Release::Components=main \
-	release "$dist" > "$dist/Release"
+	release "$dist" > Release
+mv Release "$dist/Release"
 
 gpg --batch --yes --armor --detach-sign -o "$dist/Release.gpg" "$dist/Release"
 gpg --batch --yes --clearsign -o "$dist/InRelease" "$dist/Release"
